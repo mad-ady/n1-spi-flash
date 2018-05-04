@@ -1,0 +1,63 @@
+#!/bin/bash
+
+SRC=$1
+DST=$2
+OFFSET=$3
+BLOCKSTOREAD=$4
+SLEEP=10
+BLOCK=4096
+CHUNKS=0
+
+die () { 
+    echo "$*" 1>&2 ; 
+    exit 1; 
+}
+getChunks () { 
+    CHUNKS=`echo "($1+$BLOCK-1)/$BLOCK" | bc` 
+}
+
+[ -n "$SRC" ] || die "Usage $0 srcfile /dev/mtdx offset [blockstoread]"
+[ -n "$DST" ] || die "Usage $0 srcfile /dev/mtdx offset [blockstoread]"
+[ -n "$OFFSET" ] || die "Usage $0 srcfile /dev/mtdx offset [blockstoread]"
+
+#offset must be a multiple of block
+OFFSETREMAINDER=$(echo $OFFSET%$BLOCK|bc)
+if [ "$OFFSETREMAINDER" -ne 0 ]; then
+	die "Offset $OFFSET is not a multiple of $BLOCK"
+fi
+OFFSETBASE=$(echo $OFFSET/$BLOCK | bc)
+
+
+if [[ "$SRC" =~ /dev/ ]]; then
+	[ -n "$BLOCKSTOREAD" ] || die "Need to specify number of blocks to read from offset";
+	#we're reading from nand
+	echo "Preparing to read..."
+	BLOCKSMINUSONE=$(echo $BLOCKSTOREAD-1|bc);
+	for i in `seq 0 BLOCKSMINUSONE`
+	do
+		skip=$(echo $OFFSETBASE+$i|bc);
+		dd if="$SRC" of="$DST" bs=$BLOCK skip=$skip seek=$i count=1 status=none
+		echo -n ".";
+		sleep $SLEEP
+	done
+
+fi
+
+if [[ "$DST" =~ /dev/ ]]; then
+	#we're writing to nand
+	echo "Preparing to write..."
+	SIZE=`stat --printf="%s" "$SRC"`;
+	getChunks "$SIZE";
+	echo "File $SRC is $SIZE bytes and $CHUNKS $BLOCK byte size blocks";
+    echo "Starting to write to $DST from offset $OFFSET...";
+	CHUNKSMINUSONE=$(echo $CHUNKS-1|bc)
+    for i in `seq 0 $CHUNKSMINUSONE`
+	do
+		seek=$(echo $OFFSETBASE+$i|bc);
+		dd if="$SRC" of="$DST" bs=$BLOCK seek="$seek" skip=$i count=1 status=none
+		echo -n ".";
+		sleep $SLEEP
+	done
+
+fi
+
