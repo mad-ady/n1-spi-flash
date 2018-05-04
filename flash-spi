@@ -33,13 +33,14 @@ if [[ "$SRC" =~ /dev/ ]]; then
 	#we're reading from nand
 	echo "Preparing to read..."
 	BLOCKSMINUSONE=$(echo $BLOCKSTOREAD-1|bc);
-	for i in `seq 0 BLOCKSMINUSONE`
+	for i in `seq 0 $BLOCKSMINUSONE`
 	do
 		skip=$(echo $OFFSETBASE+$i|bc);
 		dd if="$SRC" of="$DST" bs=$BLOCK skip=$skip seek=$i count=1 status=none
 		echo -n ".";
 		sleep $SLEEP
 	done
+	echo ""
 
 fi
 
@@ -58,6 +59,6 @@ if [[ "$DST" =~ /dev/ ]]; then
 		echo -n ".";
 		sleep $SLEEP
 	done
-
+	echo ""
 fi
 
